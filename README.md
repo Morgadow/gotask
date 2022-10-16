@@ -122,3 +122,7 @@ Progress: 70%, Remaining Load: 3, Duration: 1.921 s, Remain Time: 3.078 s, CurrT
 Progress: 90%, Remaining Load: 1, Duration: 2.401 s, Remain Time: 2.598 s, CurrTask: task 9
 Worker finished with error:  <nil>
 ```
+
+## Changelog
+
+- **v1.0**: First working and tested release.
