@@ -125,4 +125,7 @@ Worker finished with error:  <nil>
 
 ## Changelog
 
-- **v1.0**: First working and tested release.
+- **v1.0.0**: First working and tested release.
+  - can create tasks and subtasks with individual targets
+  - targets are function pointer which are executed on task execution
+  - no context management or function parameters possible, those must be gathered using getter() methods inside target
