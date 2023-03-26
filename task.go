@@ -14,12 +14,13 @@ type Task struct {
 	state    State
 	progress Progress
 	weight   Weight
-	target   func()
+	target   func(interface{})
+	arg      interface{}
 	desc     string
 }
 
 // NewTask Factory method for creating a new task for proper initialition
-func NewTask(name string, weight Weight, desc string, target func()) *Task {
+func NewTask(name string, weight Weight, desc string, target func(arg interface{}), arg interface{}) *Task {
 	task := Task{
 		name:     name,
 		state:    Waiting,
@@ -27,6 +28,7 @@ func NewTask(name string, weight Weight, desc string, target func()) *Task {
 		weight:   weight,
 		desc:     desc,
 		target:   target,
+		arg:      arg,
 	}
 	return &task
 }
@@ -35,7 +37,7 @@ func NewTask(name string, weight Weight, desc string, target func()) *Task {
 func (t *Task) Run() {
 	t.progress = MinProgress
 	t.state = Running
-	t.target()
+	t.target(t.arg)
 	t.state = Finished
 	t.progress = MaxProgress
 }
@@ -51,6 +53,7 @@ func (t *Task) GetState() State {
 }
 
 // GetProgress Returns Task progress
+// Note: A task can be either not done or done, progress is not a float here
 func (t *Task) GetProgress() Progress {
 	return t.progress
 }

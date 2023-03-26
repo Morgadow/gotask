@@ -62,8 +62,7 @@ func (w *Worker) Run(timeout time.Duration) error {
 	w.startTime = time.Now()
 	if timeout > 0 {
 		w.timeoutSet = true
-		w.timeoutTime = w.startTime.Add(timeout * time.Second)
-		go w.timeoutChecker()
+		w.timeoutTime = w.startTime.Add(timeout)
 	} else {
 		w.timeoutSet = false
 	}
@@ -79,6 +78,7 @@ func (w *Worker) Run(timeout time.Duration) error {
 // Wait Calling goroutine waits until worker is finished.
 // This must be used if the main goroutine would finish otherwise before the worker is done.
 func (w *Worker) Wait() error {
+	// TODO add timeout
 	if w.state != Running {
 		return ErrWorkerNotRunning
 	}
@@ -155,7 +155,7 @@ func (w *Worker) GetState() State {
 	return w.state
 }
 
-// GetProgress Returns present queue progress
+// GetProgress Returns present queue progress in percent from 0 to 100
 func (w *Worker) GetProgress() Progress {
 	if w.state == Running {
 		w.updateProgress()
@@ -181,7 +181,7 @@ func (w *Worker) GetRemainingWorkLoad() float64 {
 	return remainLoad
 }
 
-// GetDuration Get duration for how long worker was or is running.
+// GetDuration Get duration for how long worker was or is running in seconds
 // Note: Not to be called on worker in Waiting state
 func (w *Worker) GetDuration() (float64, error) {
 	if w.state == Waiting {
@@ -190,7 +190,7 @@ func (w *Worker) GetDuration() (float64, error) {
 	return float64(time.Since(w.startTime)/time.Millisecond) / 1000, nil
 }
 
-// GetDuration Get duration for how long worker was or is running.
+// GetDuration Get duration for how long worker was or is running in seconds
 // Note: Only to be called during running worker. If no timeout set, a -1 is returned
 func (w *Worker) GetRemainingTime() (float64, error) {
 	if w.state != Running {
@@ -217,6 +217,11 @@ func (w *Worker) IsFinished() bool {
 	return w.state == Finished
 }
 
+// GetSubtasks Returns copy of all subtasks as slice
+func (w *Worker) GetSubtasks() []Runnable {
+	return w.taskQueue
+}
+
 // GetCurrentTaskName Returns name of presently running task
 func (w *Worker) GetCurrentTaskName() (string, error) {
 	if w.state != Running || w.currSubTask == nil {
@@ -239,26 +244,15 @@ func (w *Worker) GetCurrentTaskDesc() (string, error) {
 	return w.currSubTask.GetDesc(), nil
 }
 
-// GetCurrentTaskProgress Returns progress of presently running task
-func (w *Worker) GetCurrentTaskProgress() (Progress, error) {
-	if w.state != Running || w.currSubTask == nil {
-		return 0, ErrWorkerNotRunning
-	}
-	if w.GetAmountSubtasks() == 0 {
-		return 0, ErrWorkerTaskQueueEmpty
-	}
-	return w.currSubTask.GetProgress(), nil
-}
-
 // updateProgress Updates internal progress over all tasks
 func (w *Worker) updateProgress() {
 	workTotal := 0
 	workDone := 0
 	for _, task := range w.taskQueue {
 		workTotal += int(task.GetWeight())
-		workDone += int(task.GetProgress()) * int(task.GetWeight())
+		workDone += int(task.GetProgress()/100) * int(task.GetWeight())
 	}
-	w.progress = (Progress(workDone) / Progress(workTotal))
+	w.progress = (Progress(workDone) / Progress(workTotal)) * 100 // multiply by 100 for percent
 }
 
 // runInternal Internal run function which is run in another context to handle timeout and termination
@@ -268,33 +262,34 @@ out:
 	for idx, task := range w.taskQueue {
 		select {
 		case <-w.quit:
+			w.state = Canceled
+			w.err = ErrWorkerCanceledByUser
 			break out
 		default:
+			w.updateProgress()
+
+			if w.timeoutReached() {
+				w.state = TimeoutReached
+				w.err = ErrWorkerTimeoutReached
+				break out
+			}
+
+			// call next subtask
 			w.currSubTaskIdx = idx
 			w.currSubTask = task
 			w.currSubTask.Run()
+
+			if w.currSubTaskIdx == len(w.taskQueue)-1 {
+				w.state = Finished
+				w.updateProgress()
+			}
 		}
-	}
-	if w.currSubTaskIdx == len(w.taskQueue)-1 {
-		w.state = Finished
-	} else {
-		w.state = Canceled
 	}
 	w.wg.Done()
 }
 
 // timeoutChecker If a timeout is set, this checks every 50 ms if a termination is needed
-func (w *Worker) timeoutChecker() {
-	for w.state == Running {
-		time.Sleep(50 * time.Millisecond)
-		remain, err := w.GetRemainingTime()
-		if err != nil {
-			return
-		}
-		if remain < 0 {
-			w.quit <- true
-			w.err = ErrWorkerTimeoutReached
-			return
-		}
-	}
+func (w *Worker) timeoutReached() bool {
+	remain, _ := w.GetRemainingTime()
+	return w.timeoutSet && remain < 0
 }
