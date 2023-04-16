@@ -24,8 +24,8 @@ type Worker struct {
 	taskQueue      []Runnable
 	currSubTask    Runnable
 	currSubTaskIdx int
-	startTime      time.Time
-	timeoutTime    time.Time
+	startTime      time.Time // time the worker was started
+	timeoutTime    time.Time // time the timeout will be reached, if no timeout set, this is not set
 	timeoutSet     bool
 	wg             sync.WaitGroup // waitgroup so main routine can wait until worker is finished, used by Wait()
 	quit           chan (bool)    // channel to hold quit information, this will stop running next task in line
@@ -75,10 +75,8 @@ func (w *Worker) Run(timeout time.Duration) error {
 	return nil
 }
 
-// Wait Calling goroutine waits until worker is finished.
-// This must be used if the main goroutine would finish otherwise before the worker is done.
+// Wait Wait until worker is finished
 func (w *Worker) Wait() error {
-	// TODO add timeout
 	if w.state != Running {
 		return ErrWorkerNotRunning
 	}
@@ -288,7 +286,7 @@ out:
 	w.wg.Done()
 }
 
-// timeoutChecker If a timeout is set, this checks every 50 ms if a termination is needed
+// timeoutReached Checks if timeout of worker was reached
 func (w *Worker) timeoutReached() bool {
 	remain, _ := w.GetRemainingTime()
 	return w.timeoutSet && remain < 0

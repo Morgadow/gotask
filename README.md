@@ -20,6 +20,7 @@ const (
  Running  State = iota // Task or Worker currently running
  Canceled State = iota // Worker was stopped before finished due to timeout or due to user cancelled it
  Finished State = iota // Task or Worker finished. To rerun again call the reset method
+ TimeoutReached State = iota // Worker did not finish in time, equal to Canceled
 )
 ```
 
@@ -40,10 +41,12 @@ While creating the **Task** *name* and *description* are defined for later statu
 The task *weight* marks the amount of work which is done inside the **Task**. A *weight* of 1 stands for a duration of about one second of work time.
 This information is later used to estimate the over percentage of **Worker** progress.
 
-The *target* parameter is the function to be executed inside the **Task**. This function does not take any input parameter and does not output any. If any data is needed here, it must be gathered using a get() function or similar.
+The *target* parameter is the function to be executed inside the **Task**.
+This function does take any input value and can return an error.
+To return any other value use pointers in the input struct.
 
 ```golang
-func NewTask(name string, weight Weight, desc string, target func()) *Task {}
+func NewTask(name string, weight Weight, desc string, target func(arg interface{}) error, arg interface{}) *Task {}
 ```
 
 Fill **Worker** with multiple tasks using the *AddTask()* method.

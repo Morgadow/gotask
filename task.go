@@ -14,13 +14,13 @@ type Task struct {
 	state    State
 	progress Progress
 	weight   Weight
-	target   func(interface{})
+	target   func(interface{}) error // target function of task, any return value must be handled using by input pointers
 	arg      interface{}
 	desc     string
 }
 
-// NewTask Factory method for creating a new task for proper initialition
-func NewTask(name string, weight Weight, desc string, target func(arg interface{}), arg interface{}) *Task {
+// NewTask Factory method for creating a new task for proper initialition.
+func NewTask(name string, weight Weight, desc string, target func(arg interface{}) error, arg interface{}) *Task {
 	task := Task{
 		name:     name,
 		state:    Waiting,
@@ -33,7 +33,7 @@ func NewTask(name string, weight Weight, desc string, target func(arg interface{
 	return &task
 }
 
-// Run Runs task target function
+// Run Runs task target function, this is called by worker
 func (t *Task) Run() {
 	t.progress = MinProgress
 	t.state = Running

@@ -8,9 +8,10 @@ import (
 )
 
 // Sleeping test function which halts goroutine for defined length
-func Sleeping(dur interface{}) {
+func Sleeping(dur interface{}) error {
 	duration := dur.(int)
 	time.Sleep(time.Millisecond * time.Duration(duration))
+	return nil
 }
 
 // helper function
